@@ -17,6 +17,7 @@ class ReplayBatch:
   history: Tensor
   clips: Tensor
   frames: Tensor
+  valid: Tensor | None = None
 
 
 class TemporalReplay:
@@ -117,30 +118,44 @@ class TemporalReplay:
     self.count = min(self.capacity, self.count + 1)
 
   def sample(self, batch_size: int, window: int = 8, history: int = 10) -> ReplayBatch:
-    total = history - 1 + window
-    if self.count < total:
+    if min(batch_size, window, history) < 1:
+      raise ValueError("Positive replay batch, window and history sizes required")
+    if not self.count:
       raise ValueError("Replay has too few temporal samples")
     oldest = self.cursor if self.count == self.capacity else 0
-    starts = torch.arange(self.count - total + 1, device=self.device)
-    rows = (
-      oldest + starts[:, None] + torch.arange(total, device=self.device)
-    ) % self.capacity
-    # Permit termination at the last supervised transition, never before it.
-    valid = ~self.boundaries[rows[:, :-1]].any(dim=1)
-    candidates = valid.nonzero()
-    if not len(candidates):
-      raise ValueError("No replay windows without reset boundaries")
-    pick = candidates[torch.randint(len(candidates), (batch_size,), device=self.device)]
-    indexes, envs = rows[pick[:, 0]], pick[:, 1]
+    starts = torch.randint(self.count, (batch_size,), device=self.device)
+    envs = torch.randint(self.num_envs, (batch_size,), device=self.device)
     env_grid = envs[:, None]
-    step_rows = indexes[:, history - 1 :]
+    offsets = torch.arange(window, device=self.device)
+    positions = starts[:, None] + offsets
+    available = positions < self.count
+    rows = (oldest + positions.clamp_max(self.count - 1)) % self.capacity
+    # Keep the terminal transition. Pad later rows with it, without supervising
+    # them or reading the reset episode, including at the newest replay row.
+    ends = torch.where(self.boundaries[rows, env_grid] & available, offsets, window)
+    last = torch.minimum(ends.amin(1), self.count - 1 - starts)
+    valid = offsets <= last[:, None]
+    step_rows = (
+      oldest + starts[:, None] + torch.minimum(offsets, last[:, None])
+    ) % self.capacity
+
+    positions = starts[:, None] + torch.arange(1 - history, 1, device=self.device)
+    rows = (oldest + positions.clamp_min(0)) % self.capacity
+    # A boundary belongs to the preceding transition. Missing observations
+    # repeat the earliest available frame of this episode, as collection does.
+    previous_end = (
+      self.boundaries[rows, env_grid] & (positions >= 0) & (positions < starts[:, None])
+    )
+    first = torch.where(previous_end, positions + 1, 0).amax(1)
+    history_rows = (oldest + torch.maximum(positions, first[:, None])) % self.capacity
     return ReplayBatch(
       self.states[step_rows, env_grid],
       self.next_states[step_rows, env_grid],
       self.actions[step_rows, env_grid],
       self.context[step_rows[:, 0], envs],
       self.terminated[step_rows, env_grid],
-      self.observations[indexes[:, :history], env_grid],
+      self.observations[history_rows, env_grid],
       self.clips[step_rows[:, 0], envs],
       self.frames[step_rows[:, 0], envs],
+      valid,
     )

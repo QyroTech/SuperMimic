@@ -1,0 +1,16 @@
+# 烟测：用 q1_v3 资产 + 转换好的 50Hz 训练数据跑 2 轮，验证管线通路。
+[train]
+robot_xml = "../assets/q1_v3/xml/q1_v3_mc.xml"
+motion_dir = "../datasets/train_50hz/motion_lafan/complex_motion"
+output_dir = "../logs/cpu_smoke_v3"
+device = "cpu"
+max_motions = 1
+num_envs = 2
+iterations = 2
+model_batch_size = 4
+policy_batch_size = 4
+model_batches = 1
+critic_epochs = 1
+critic_minibatches = 1
+small_networks = true
+save_interval = 2

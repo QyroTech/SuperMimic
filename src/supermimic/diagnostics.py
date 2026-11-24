@@ -324,12 +324,14 @@ def diagnose(cfg: DiagnosticCfg) -> DiagnosticResult:
     robot,
     tuple(identity["model_hidden"]),
     activation=config.get("network_activation", "elu"),
+    network_profile=config.get("network_profile", "legacy"),
     representation=config.get("dynamics_representation", "legacy"),
   ).to(cfg.device)
   actor = MotionPolicy(
     robot,
     tuple(identity["actor_hidden"]),
     activation=config.get("network_activation", "elu"),
+    network_profile=config.get("network_profile", "legacy"),
   ).to(cfg.device)
   model.load_state_dict(checkpoint["model"])
   actor.load_state_dict(checkpoint["actor"])
@@ -348,7 +350,7 @@ def diagnose(cfg: DiagnosticCfg) -> DiagnosticResult:
   episodes = collect_episodes(robot, actor, motions, simulator, cfg)
   horizons = [score_horizon(robot, model, episodes, h) for h in (1, 8, 32)]
   result = DiagnosticResult(
-    robot="q1_v2",
+    robot="q1_v3",
     checkpoint=str(cfg.checkpoint.resolve()),
     checkpoint_iteration=int(checkpoint["iteration"]),
     asset_sha256=robot.asset_sha256,

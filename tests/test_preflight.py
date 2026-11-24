@@ -21,7 +21,7 @@ from supermimic.robot import Q1Robot
 
 @pytest.fixture
 def preflight_robot(tmp_path: Path) -> Q1Robot:
-  tree = ET.Element("mujoco", model="q1_v2")
+  tree = ET.Element("mujoco", model="q1_v3")
   ET.SubElement(tree, "compiler", angle="radian", autolimits="true")
   world = ET.SubElement(tree, "worldbody")
   ET.SubElement(world, "geom", name="floor", type="plane", size="1 1 0.1")
@@ -75,7 +75,7 @@ def save_motion(
     path,
     qpos=qpos,
     fps=fps,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     robot_joint_names=names,
   )

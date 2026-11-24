@@ -1,7 +1,7 @@
 # Copy this file before editing. Paths are relative to this TOML file.
 # Counts are GLOBAL totals, split across --gpus; never multiplied by GPU count.
 [train]
-robot_xml = "../assets/q1_v2/xml/q1_v2_mc.xml"
+robot_xml = "../assets/q1_v3/xml/q1_v3_mc.xml"
 motion_dir = "../data/q1_motion_library"
 output_dir = "../logs/q1_long"
 motion_pattern = "*/*.npz"

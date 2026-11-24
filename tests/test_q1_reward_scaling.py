@@ -15,7 +15,7 @@ from supermimic.robot import Q1Robot, RewardScaling, normalize_quat
 
 
 def write_robot(path: Path, length_scale: float = 1.0) -> Path:
-  tree = ET.Element("mujoco", model="q1_v2")
+  tree = ET.Element("mujoco", model="q1_v3")
   ET.SubElement(tree, "compiler", angle="radian", autolimits="true")
   world = ET.SubElement(tree, "worldbody")
   root = ET.SubElement(world, "body", name="pelvis", pos=f"0 0 {0.793 * length_scale}")

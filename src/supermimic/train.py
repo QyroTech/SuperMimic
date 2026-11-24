@@ -35,6 +35,7 @@ from supermimic.models import (
   MotionPolicy,
   WorldModel,
 )
+from supermimic.normalization import MLPPrecision, NetworkProfile, RunningNorm
 from supermimic.randomization import RandomizationCfg
 from supermimic.replay import TemporalReplay
 from supermimic.reward_tuning import RewardTuningCfg
@@ -72,6 +73,9 @@ class TrainCfg:
   model_batch_size: int = 128
   policy_batch_size: int = 128
   model_batches: int = 10
+  horizon: int = 32
+  # Default zero retains existing runs; fresh example uses 500.
+  model_warmup_iterations: int = 0
   critic_epochs: int = 5
   critic_minibatches: int = 4
   learning_rate: float = 2e-4
@@ -83,6 +87,8 @@ class TrainCfg:
   modeled_action_delay: bool = False
   network_activation: Literal["elu", "silu"] = "elu"
   dynamics_representation: Literal["legacy", "heading"] = "legacy"
+  network_profile: NetworkProfile = "legacy"
+  mlp_precision: MLPPrecision = "fp32"
   normalize_policy_objective: bool = False
   normalize_model_objective: bool = False
   randomize: bool = True
@@ -183,6 +189,7 @@ def _train(
       cfg.model_batch_size,
       cfg.policy_batch_size,
       cfg.model_batches,
+      cfg.horizon,
       cfg.critic_epochs,
       cfg.critic_minibatches,
       cfg.save_interval,
@@ -190,6 +197,8 @@ def _train(
     < 1
   ):
     raise ValueError("Counts, batches and intervals must be positive")
+  if cfg.model_warmup_iterations < 0:
+    raise ValueError("Model warmup must be nonnegative")
   if cfg.replay_steps < 10 or cfg.max_motions < 0 or cfg.learning_rate <= 0:
     raise ValueError("Invalid replay size, motion limit or learning rate")
   if cfg.motion_memory_gb <= 0:
@@ -260,13 +269,29 @@ def _train(
       model_hidden,
       activation=cfg.network_activation,
       representation=cfg.dynamics_representation,
+      network_profile=cfg.network_profile,
     ).to(cfg.device)
-    actor = MotionPolicy(robot, actor_hidden, activation=cfg.network_activation).to(
-      cfg.device
-    )
-    critic = Critic(robot, critic_hidden, activation=cfg.network_activation).to(
-      cfg.device
-    )
+    actor = MotionPolicy(
+      robot,
+      actor_hidden,
+      activation=cfg.network_activation,
+      network_profile=cfg.network_profile,
+    ).to(cfg.device)
+    critic = Critic(
+      robot,
+      critic_hidden,
+      activation=cfg.network_activation,
+      network_profile=cfg.network_profile,
+    ).to(cfg.device)
+    if cfg.mlp_precision not in ("fp32", "bf16"):
+      raise ValueError("Unknown MLP precision")
+    precision = cfg.mlp_precision if cfg.device != "cpu" else "fp32"
+    if precision == "bf16":
+      with torch.cuda.device(cfg.device):
+        if not torch.cuda.is_bf16_supported():
+          raise ValueError("GPU does not support bf16; select fp32 explicitly")
+    for network in (model, actor, critic):
+      network.mlp_precision = precision
     algorithm = SuperMimic(
       robot,
       motions,
@@ -274,6 +299,7 @@ def _train(
       actor,
       critic,
       cfg.learning_rate,
+      horizon=cfg.horizon,
       distributed=group,
       cache_reference_heads=cfg.cache_reference_heads,
       cache_goals=cfg.cache_goals,
@@ -448,6 +474,8 @@ def _train(
     "training_semantics": {
       "clean_policy_actions": cfg.clean_policy_actions,
       "action_lag": cfg.action_lag,
+      "horizon": cfg.horizon,
+      "model_warmup_iterations": cfg.model_warmup_iterations,
       "normalize_policy_objective": cfg.normalize_policy_objective,
       "normalize_model_objective": cfg.normalize_model_objective,
       "imagination_terminal_handling": TERMINAL_HANDLING,
@@ -478,10 +506,16 @@ def _train(
     "obs_dim": robot.obs_dim,
     "context_dim": robot.context_dim,
     "randomization": asdict(simulator.randomization),
+    "mlp_precision_actual": precision,
     "network_architecture": {
       "activation": cfg.network_activation,
       "representation": cfg.dynamics_representation,
       "modeled_action_delay": cfg.modeled_action_delay,
+      **(
+        {"network_profile": cfg.network_profile}
+        if cfg.network_profile != "legacy"
+        else {}
+      ),
     },
     "model_hidden": model_hidden,
     "actor_hidden": actor_hidden,
@@ -564,6 +598,11 @@ def _train(
           )
         },
       )
+      saved_semantics = {
+        "horizon": 32,
+        "model_warmup_iterations": 0,
+        **saved_semantics,
+      }
       if saved_semantics != identity["training_semantics"]:
         raise ValueError(
           "Checkpoint training semantics changed; use a new warm-start run"
@@ -691,7 +730,7 @@ def _train(
     print(
       json.dumps(
         {
-          "robot": "q1_v2",
+          "robot": "q1_v3",
           "selected_motions": len(paths),
           "ranks": group.world_size,
           "num_envs": cfg.num_envs * group.world_size,
@@ -724,6 +763,7 @@ def _train(
       # Time only the last iterations, so lazy kernel compilation and the
       # first replay fills stay out of the measurement.
       update_started = time.monotonic()
+      actor_update = iteration >= cfg.model_warmup_iterations
       iteration_phases.clear()
       profiling = iteration >= cfg.iterations - cfg.profile_iterations or bool(
         cfg.profile_every and iteration > 0 and iteration % cfg.profile_every == 0
@@ -741,7 +781,10 @@ def _train(
           for attempt in range(500):
             try:
               model_batch = replay.sample(cfg.model_batch_size, window=8, history=1)
-              policy_batch = replay.sample(cfg.policy_batch_size, window=1, history=10)
+              if actor_update:
+                policy_batch = replay.sample(
+                  cfg.policy_batch_size, window=1, history=10
+                )
               break
             except ValueError:
               if attempt == 499:
@@ -749,7 +792,8 @@ def _train(
                   "No valid replay windows; inspect reset poses and controls"
                 ) from None
               collect()
-      assert model_batch is not None and policy_batch is not None
+      assert model_batch is not None
+      algorithm.update_normalizers(model_batch)
       factor = 0.03 + 0.97 * 0.5 * (
         1 + math.cos(math.pi * min(iteration, 250000) / 250000)
       )
@@ -784,11 +828,25 @@ def _train(
           model_tensors = algorithm.fit_model_tensors(batch)
         model_metrics = {name: float(value) for name, value in model_tensors.items()}
       with phase("policy"):
-        metrics = model_metrics | algorithm.improve_policy(
-          policy_batch, cfg.critic_epochs, cfg.critic_minibatches
-        )
+        metrics = model_metrics
+        if actor_update:
+          assert policy_batch is not None
+          metrics = metrics | algorithm.improve_policy(
+            policy_batch, cfg.critic_epochs, cfg.critic_minibatches
+          )
+        metrics["actor_update"] = float(actor_update)
       group.validate_update()
       metrics["collection_reward"] = collection_reward
+      if iteration % 10 == 0:
+        for name, norm in (
+          ("model_input", model.input_norm),
+          ("model_output", model.output_norm),
+          ("observation", actor.obs_norm),
+          ("goal", actor.goal_norm),
+          ("critic", critic.input_norm),
+        ):
+          if isinstance(norm, RunningNorm):
+            metrics[f"normalizer_samples/{name}"] = float(norm.count)
       if group.enabled:
         # Losses and rewards are per-rank samples of one global quantity, so the
         # log reports their mean rather than whatever rank 0 happened to see.

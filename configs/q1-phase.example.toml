@@ -1,7 +1,7 @@
 # Experimental NEW phase, not a strict optimizer/trajectory continuation.
 # All env/batch counts are GLOBAL totals split by --gpus.
 [train]
-robot_xml = "../assets/q1_v2/xml/q1_v2_mc.xml"
+robot_xml = "../assets/q1_v3/xml/q1_v3_mc.xml"
 motion_dir = "../data/q1_motion_library_filtered"
 output_dir = "../logs/q1_new_phase"
 warm_start = "../logs/q1_previous/checkpoint_30000.pt"

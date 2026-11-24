@@ -7,24 +7,42 @@ from typing import Literal
 import torch
 from torch import Tensor, nn
 
+from supermimic.normalization import (
+  MLPPrecision,
+  NetworkProfile,
+  RunningNorm,
+  run_mlp,
+)
 from supermimic.robot import (
   Q1Robot,
   normalize_quat,
+  quat_apply,
+  quat_inverse,
+  quat_mul,
 )
-from supermimic.state_representation import HeadingState
+from supermimic.state_representation import (
+  HeadingState,
+  heading_quat,
+  quaternion_log,
+)
 
 Activation = Literal["elu", "silu"]
 Representation = Literal["legacy", "heading"]
 
 
 def mlp(
-  inputs: int, hidden: tuple[int, ...], outputs: int, activation: Activation = "elu"
+  inputs: int,
+  hidden: tuple[int, ...],
+  outputs: int,
+  activation: Activation = "elu",
+  layer_norm: bool = False,
 ) -> nn.Sequential:
   layers: list[nn.Module] = []
   for width in hidden:
-    layers.extend(
-      (nn.Linear(inputs, width), nn.SiLU() if activation == "silu" else nn.ELU())
-    )
+    layers.append(nn.Linear(inputs, width))
+    if layer_norm:
+      layers.append(nn.LayerNorm(width))
+    layers.append(nn.SiLU() if activation == "silu" else nn.ELU())
     inputs = width
   layers.append(nn.Linear(inputs, outputs))
   return nn.Sequential(*layers)
@@ -78,21 +96,30 @@ class WorldModel(nn.Module):
     *,
     activation: Activation = "elu",
     representation: Representation = "legacy",
+    network_profile: NetworkProfile = "legacy",
   ):
     super().__init__()
     self.register_buffer("scale", state_scale(robot))
     self.representation = representation
+    if network_profile not in ("legacy", "running_silu"):
+      raise ValueError("Unknown network profile")
+    running = network_profile == "running_silu"
+    if running and representation != "heading":
+      raise ValueError("Running SiLU dynamics require heading representation")
+    self.network_profile = network_profile
+    self.mlp_precision: MLPPrecision = "fp32"
     self.heading_state = HeadingState() if representation == "heading" else None
     self.modeled_action_delay = robot.modeled_action_delay
     if self.modeled_action_delay:
       context_scale = torch.ones(robot.context_dim)
       context_scale[robot.context_layout.delay_s] = 0.016
       self.register_buffer("context_scale", context_scale)
+    inputs = robot.state_dim + 22 + robot.context_dim
+    outputs = 56 if self.heading_state is not None else robot.physical_dim
+    self.input_norm = RunningNorm(inputs) if running else nn.Identity()
+    self.output_norm = RunningNorm(outputs, eps=1e-4) if running else nn.Identity()
     self.dynamics = mlp(
-      robot.state_dim + 22 + robot.context_dim,
-      hidden,
-      56 if self.heading_state is not None else robot.physical_dim,
-      activation,
+      inputs, hidden, outputs, "silu" if running else activation, layer_norm=running
     )
     self.termination = mlp(
       4 if self.heading_state is not None else 2,
@@ -121,23 +148,55 @@ class WorldModel(nn.Module):
       nn.init.normal_(last.weight, std=0.001)
     nn.init.zeros_(last.bias)
 
-  # Torch 2.7 types forward as a mutable Callable; overriding it is its public API.
-  def forward(self, state: Tensor, action: Tensor, context: Tensor) -> Tensor:  # ty: ignore[invalid-mutable-override]
+  def input_features(self, state: Tensor, action: Tensor, context: Tensor) -> Tensor:
     if self.heading_state is not None:
       model_context = (
         context / self.context_scale if self.modeled_action_delay else context
       )
-      residual = self.dynamics(
-        torch.cat((self.heading_state.features(state), action, model_context), -1)
-      )
-      return self.heading_state.integrate(state, residual, action)
-    # Absolute world XY is irrelevant to flat-ground dynamics.
+      return torch.cat((self.heading_state.features(state), action, model_context), -1)
     x = torch.cat((torch.zeros_like(state[:, :2]), state[:, 2:] / self.scale[2:]), -1)
-    residual = self.dynamics(torch.cat((x, action, context), -1))
+    return torch.cat((x, action, context), -1)
+
+  def forward(self, state: Tensor, action: Tensor, context: Tensor) -> Tensor:  # ty: ignore[invalid-mutable-override]
+    residual = run_mlp(
+      self.dynamics,
+      self.input_norm(self.input_features(state, action, context)),
+      self.mlp_precision,
+    )
+    if isinstance(self.output_norm, RunningNorm):
+      residual = self.output_norm.denormalize(residual)
+    if self.heading_state is not None:
+      return self.heading_state.integrate(state, residual, action)
     physical = state[:, :57] + 0.02 * self.scale[:57] * residual
     return torch.cat(
       (physical[:, :3], normalize_quat(physical[:, 3:7]), physical[:, 7:], action), -1
     )
+
+  def output_target(self, state: Tensor, successor: Tensor) -> Tensor:
+    """Invert the existing heading integrator, without changing its physics."""
+    if self.heading_state is None:
+      return (successor[..., :57] - state[..., :57]) / (0.02 * self.scale[:57])
+    rotation = normalize_quat(state[..., 3:7])
+    following = normalize_quat(successor[..., 3:7])
+    heading = heading_quat(rotation)
+    inverse_heading = quat_inverse(heading)
+    gyro = quat_apply(quat_inverse(rotation), state[..., 32:35])
+    next_gyro = quat_apply(quat_inverse(following), successor[..., 32:35])
+    increments = torch.cat(
+      (
+        quat_apply(inverse_heading, successor[..., 29:32] - state[..., 29:32]),
+        next_gyro - gyro,
+        successor[..., 35:57] - state[..., 35:57],
+        quat_apply(
+          inverse_heading,
+          successor[..., :3] - state[..., :3] - 0.02 * successor[..., 29:32],
+        ),
+        quaternion_log(quat_mul(quat_inverse(rotation), following)) - 0.02 * next_gyro,
+        successor[..., 7:29] - state[..., 7:29] - 0.02 * successor[..., 35:57],
+      ),
+      -1,
+    )
+    return increments / self.heading_state.output_scale
 
   def advance_context(self, context: Tensor, executed_action: Tensor) -> Tensor:
     if not self.modeled_action_delay:
@@ -147,9 +206,11 @@ class WorldModel(nn.Module):
   def termination_logits(self, robot: Q1Robot, state: Tensor, target: Tensor) -> Tensor:
     if self.heading_state is not None:
       features = robot.termination_features(state, target) / self.termination_scale
-      return self.termination(torch.cat((features, features.abs()), -1)).squeeze(-1)
+      return run_mlp(
+        self.termination, torch.cat((features, features.abs()), -1), self.mlp_precision
+      ).squeeze(-1)
     features = robot.termination_features(state, target) / state.new_tensor([0.25, 0.8])
-    return self.termination(features).squeeze(-1)
+    return run_mlp(self.termination, features, self.mlp_precision).squeeze(-1)
 
 
 class MotionPolicy(nn.Module):
@@ -161,8 +222,17 @@ class MotionPolicy(nn.Module):
     hidden: tuple[int, ...] = (2048, 1024, 512, 256),
     *,
     activation: Activation = "elu",
+    network_profile: NetworkProfile = "legacy",
   ):
     super().__init__()
+    if network_profile not in ("legacy", "running_silu"):
+      raise ValueError("Unknown network profile")
+    self.network_profile = network_profile
+    self.mlp_precision: MLPPrecision = "fp32"
+    running = network_profile == "running_silu"
+    activation = "elu" if running else activation
+    self.obs_norm = RunningNorm(robot.obs_dim) if running else nn.Identity()
+    self.goal_norm = RunningNorm(10 * robot.physical_dim) if running else nn.Identity()
     self.encoder = mlp(10 * robot.physical_dim, hidden, 32, activation)
     self.decoder = mlp(32 + 10 * robot.obs_dim, hidden, 22, activation)
     self.register_buffer(
@@ -177,11 +247,12 @@ class MotionPolicy(nn.Module):
     return self.decode(history, self.encode_goal(goal))
 
   def encode_goal(self, goal: Tensor) -> Tensor:
-    return self.encoder(goal).tanh()
+    return run_mlp(self.encoder, self.goal_norm(goal), self.mlp_precision).tanh()
 
   def decode(self, history: Tensor, encoding: Tensor) -> Tensor:
-    return self.decoder(
-      torch.cat((encoding, (history / self.obs_scale).flatten(1)), -1)
+    features = self.obs_norm(history / self.obs_scale).flatten(1)
+    return run_mlp(
+      self.decoder, torch.cat((encoding, features), -1), self.mlp_precision
     )
 
 
@@ -194,15 +265,31 @@ class Critic(nn.Module):
     hidden: tuple[int, ...] = (256, 128),
     *,
     activation: Activation = "elu",
+    network_profile: NetworkProfile = "legacy",
   ):
     super().__init__()
     self.register_buffer("scale", state_scale(robot))
+    if network_profile not in ("legacy", "running_silu"):
+      raise ValueError("Unknown network profile")
+    self.network_profile = network_profile
+    self.mlp_precision: MLPPrecision = "fp32"
+    running = network_profile == "running_silu"
+    activation = "elu" if running else activation
+    inputs = robot.state_dim + 10 * robot.physical_dim + robot.context_dim
+    self.input_norm = RunningNorm(inputs) if running else nn.Identity()
     self.network = mlp(
-      robot.state_dim + 10 * robot.physical_dim + robot.context_dim,
+      inputs,
       hidden,
       1,
       activation,
     )
 
   def forward(self, state: Tensor, goal: Tensor, context: Tensor) -> Tensor:  # ty: ignore[invalid-mutable-override]
-    return self.network(torch.cat((state / self.scale, goal, context), -1)).squeeze(-1)
+    return run_mlp(
+      self.network,
+      self.input_norm(self.input_features(state, goal, context)),
+      self.mlp_precision,
+    ).squeeze(-1)
+
+  def input_features(self, state: Tensor, goal: Tensor, context: Tensor) -> Tensor:
+    return torch.cat((state / self.scale, goal, context), -1)

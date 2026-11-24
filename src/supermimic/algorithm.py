@@ -19,6 +19,7 @@ from supermimic.models import (
   frozen,
   goal_features,
 )
+from supermimic.normalization import RunningNorm
 from supermimic.replay import ReplayBatch
 from supermimic.reward_tuning import BASELINE_TUNING, RewardTuningCfg, tuned_reward
 from supermimic.robot import Q1Robot
@@ -224,25 +225,31 @@ class SuperMimic:
     return next_state, reward, termination, observation, goal, value
 
   def _model_losses(
-    self, state: Tensor, logits: Tensor, label: Tensor, terminated: Tensor
+    self,
+    state: Tensor,
+    logits: Tensor,
+    label: Tensor,
+    terminated: Tensor,
+    valid: Tensor | None = None,
   ) -> tuple[Tensor, Tensor]:
     if self.model.heading_state is not None:
       error = self.model.heading_state.error(state, label)
-      return error.square().sum(-1).mean(), F.binary_cross_entropy_with_logits(
-        logits, terminated
+    else:
+      # Match quaternion hemisphere before the Euclidean state loss.
+      rotation = torch.where(
+        (state[:, 3:7] * label[:, 3:7]).sum(-1, keepdim=True) < 0,
+        -label[:, 3:7],
+        label[:, 3:7],
       )
-    # Match quaternion hemisphere before the Euclidean state loss.
-    rotation = torch.where(
-      (state[:, 3:7] * label[:, 3:7]).sum(-1, keepdim=True) < 0,
-      -label[:, 3:7],
-      label[:, 3:7],
-    )
-    label = torch.cat((label[:, :3], rotation, label[:, 7:]), -1)
-    error = (state[:, :57] - label[:, :57]) / self.model.scale[:57]
+      label = torch.cat((label[:, :3], rotation, label[:, 7:]), -1)
+      error = (state[:, :57] - label[:, :57]) / self.model.scale[:57]
     # Eq. 1 sums squared features; the replay expectation averages samples.
-    return error.square().sum(-1).mean(), F.binary_cross_entropy_with_logits(
-      logits, terminated
-    )
+    state_loss = error.square().sum(-1)
+    term_loss = F.binary_cross_entropy_with_logits(logits, terminated, reduction="none")
+    if valid is not None:
+      state_loss = torch.where(valid, state_loss, 0)
+      term_loss = torch.where(valid, term_loss, 0)
+    return state_loss.mean(), term_loss.mean()
 
   def _model_loss_step(
     self,
@@ -252,10 +259,50 @@ class SuperMimic:
     target: Tensor,
     label: Tensor,
     terminated: Tensor,
+    valid: Tensor | None = None,
   ) -> tuple[Tensor, Tensor, Tensor]:
     state, logits = self._model_step(state, action, context, target)
-    state_loss, term_loss = self._model_losses(state, logits, label, terminated)
+    state_loss, term_loss = self._model_losses(state, logits, label, terminated, valid)
     return state, state_loss, term_loss
+
+  @torch.no_grad()
+  def update_normalizers(self, batch: ReplayBatch) -> None:
+    """One synchronized calibration per update, from reset-safe real replay."""
+    if not isinstance(self.model.input_norm, RunningNorm):
+      return
+    valid = batch.valid
+    states, successors, actions = batch.states, batch.next_states, batch.actions
+    if valid is not None:
+      states = torch.where(valid[..., None], states, states[:, :1])
+      successors = torch.where(valid[..., None], successors, states[:, :1])
+      actions = torch.where(valid[..., None], actions, 0)
+    state = states.flatten(0, 1)
+    action = actions.flatten(0, 1)
+    context = batch.context[:, None].expand(-1, batch.states.shape[1], -1)
+    if self.model.modeled_action_delay:
+      context = torch.cat((context[..., :-22], states[..., 57:79]), -1)
+    self.model.input_norm.update(
+      self.model.input_features(state, action, context.flatten(0, 1)),
+      self.distributed.sum_,
+      valid=valid,
+    )
+    assert isinstance(self.model.output_norm, RunningNorm)
+    self.model.output_norm.update(
+      self.model.output_target(state, successors.flatten(0, 1)),
+      self.distributed.sum_,
+      valid=valid,
+    )
+    assert isinstance(self.actor.obs_norm, RunningNorm)
+    assert isinstance(self.actor.goal_norm, RunningNorm)
+    self.actor.obs_norm.update(
+      batch.history / self.actor.obs_scale, self.distributed.sum_
+    )
+    references = self.motions.sequence(
+      batch.clips, batch.frames, torch.arange(1, 11, device=batch.frames.device)
+    )
+    self.actor.goal_norm.update(
+      goal_features(self.robot, references), self.distributed.sum_
+    )
 
   def fit_model(self, batch: ReplayBatch) -> dict[str, float]:
     return {name: float(value) for name, value in self.fit_model_tensors(batch).items()}
@@ -272,25 +319,30 @@ class SuperMimic:
     state_losses, term_losses = [], []
     self.model_optimizer.zero_grad(set_to_none=True)
     for t in range(batch.actions.shape[1]):
+      valid = None if batch.valid is None else batch.valid[:, t]
+      action, target = batch.actions[:, t], targets[:, t]
+      label, terminated = batch.next_states[:, t], batch.terminated[:, t]
+      if valid is not None:
+        # Inactive suffixes cannot feed an unbounded imagined rollout or NaNs
+        # through autograd. Only the valid real prefix contributes gradients.
+        state = torch.where(valid[:, None], state, batch.states[:, 0])
+        context = torch.where(valid[:, None], context, batch.context)
+        action = torch.where(valid[:, None], action, 0)
+        target = torch.where(valid[:, None], target, targets[:, 0])
+        label = torch.where(valid[:, None], label, batch.states[:, 0])
+        terminated = torch.where(valid, terminated, 0)
       if self.fuse_model_loss:
         state, state_loss, term_loss = self.model_loss_step(
-          state,
-          batch.actions[:, t],
-          context,
-          targets[:, t],
-          batch.next_states[:, t],
-          batch.terminated[:, t],
+          state, action, context, target, label, terminated, valid
         )
       else:
-        state, logits = self.model_step(
-          state, batch.actions[:, t], context, targets[:, t]
-        )
+        state, logits = self.model_step(state, action, context, target)
         state_loss, term_loss = self._model_losses(
-          state, logits, batch.next_states[:, t], batch.terminated[:, t]
+          state, logits, label, terminated, valid
         )
       state_losses.append(state_loss)
       term_losses.append(term_loss)
-      context = self.model.advance_context(context, batch.actions[:, t])
+      context = self.model.advance_context(context, action)
     state_loss = torch.stack(state_losses).sum()
     term_loss = torch.stack(term_losses).sum()
     if self.normalize_model_objective:
@@ -505,6 +557,10 @@ class SuperMimic:
     critic_epochs: int,
     critic_minibatches: int,
   ) -> Tensor:
+    if isinstance(self.critic.input_norm, RunningNorm):
+      self.critic.input_norm.update(
+        self.critic.input_features(x, g, ctx), self.distributed.sum_, weight
+      )
     critic_losses = []
     for _ in range(critic_epochs):
       order = torch.randperm(len(x), device=x.device)

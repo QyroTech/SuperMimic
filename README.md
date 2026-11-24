@@ -1,6 +1,6 @@
 # SuperMimic-Q1
 
-基于 PyTorch、MuJoCo 和 MuJoCo Warp 的 Q1 V2 全身动作跟踪训练。
+基于 PyTorch、MuJoCo 和 MuJoCo Warp 的 Q1 V3 全身动作跟踪训练。
 支持单卡、多卡、从零训练、检查点续训、指定动作播放和整段录像。
 
 方法参考 [SuperMimic 论文](https://arxiv.org/abs/2610.28480)，代码独立实现。
@@ -29,30 +29,48 @@ sudo apt-get install ffmpeg libosmesa6
 
 ## 资产与数据
 
-自行准备 Q1 V2 XML、引用的 meshes 和 50 Hz Q1 动作。
-源码不附带机器人资产、数据集或训练权重。
+机器人资产与动作数据集均为本地自备，不随源码分发（`assets/` 与 `*.npz`
+已在 `.gitignore` 中忽略）。仓库约定的本地布局如下。
+
+### 机器人资产（Q1 V3）
 
 ```text
-assets/q1_v2/xml/q1_v2_mc.xml
-assets/q1_v2/meshes/...
-data/q1_motion_library_filtered/<source>/*.npz
-data/q1_motion_library/lafan1/*.npz
+assets/q1_v3/xml/q1_v3_mc.xml          # 训练/仿真用 MuJoCo 模型
+assets/q1_v3/xml/q1_v3.xml             # 基础模型
+assets/q1_v3/xml/q1_v3_full_range.xml  # 全关节活动范围
+assets/q1_v3/meshes/*.STL              # 24 个连杆网格
+assets/q1_v3/urdf/q1_v3*.urdf
+assets/q1_v3/config/joint_names_*.yaml
 ```
 
-训练 NPZ 字段：
+### 动作数据集
 
-| 字段 | 要求 |
+三套动作库，均为 `.npz`，按动作类别分子目录：
+
+| 数据集 | 子目录（片段数） | 合计 |
+|---|---|---:|
+| `datasets/motion_amass` | complex 588 · simple 914 · singularity 78 · unreasonable 414 | 1994 |
+| `datasets/motion_lafan` | complex 39 · simple 4 · singularity 12 · unreasonable 21 | 76 |
+| `datasets/motion_yuanke` | spc_base 27 · zk_base 12 · zk_base2 18 · zw_base 19 | 76 |
+
+每个 `.npz` 的字段：
+
+| 字段 | 内容 |
 |---|---|
-| `qpos` | `[T,29]`，根位置、WXYZ 四元数、22 关节角 |
-| `robot_joint_names` | 22 个 Q1 关节名称 |
-| `robot_name` | `q1_v2` |
-| `root_quat_order` | `wxyz` |
-| `fps` | `50.0` |
+| `fps` | 采样帧率（amass ≈29.7，lafan/yuanke 为 30） |
+| `root_pos` | `[T,3]` 根位置 |
+| `root_rot` | `[T,4]` 根旋转四元数 |
+| `dof_pos` | `[T,D]` 关节角，`D=24`（amass、lafan）或 `22`（yuanke） |
+| `local_body_pos` | `[T,B,3]` 各连杆局部位置，可为空 |
+| `link_body_list` | `B` 个连杆名称，可为空 |
+
+含空字段（`local_body_pos`/`link_body_list`）的文件需用
+`np.load(path, allow_pickle=True)` 读取。
 
 筛选动作：
 
 ```bash
-uv run --no-sync supermimic filter   --xml assets/q1_v2/xml/q1_v2_mc.xml   --motion-dir data/q1_motion_library --output-dir logs/data_screening   --workers 8 --sample-hz 10
+uv run --no-sync supermimic filter   --xml assets/q1_v3/xml/q1_v3_mc.xml   --motion-dir datasets/motion_lafan --output-dir logs/data_screening   --workers 8 --sample-hz 10
 ```
 
 ## 八卡从零训练
@@ -107,14 +125,14 @@ iterations = 250000
 ## 选择动作播放
 
 ```bash
-uv run --no-sync supermimic play   --checkpoint logs/q1_fresh/checkpoint_5000.pt   --motion data/q1_motion_library/lafan1/walk__clip000.npz   --viewer on
+uv run --no-sync supermimic play   --checkpoint logs/q1_fresh/checkpoint_5000.pt   --motion datasets/motion_lafan/complex_motion/run1_subject5.npz   --viewer on
 ```
 
 省略 `--motion` 时，可用 `--motion-index 0` 选择训练动作。
 `--speed 0.5` 半速，`--loops 3` 循环；无显示器时保存轨迹：
 
 ```bash
-uv run --no-sync supermimic play   --checkpoint logs/q1_fresh/checkpoint_5000.pt   --motion data/q1_motion_library/lafan1/walk__clip000.npz   --viewer off --output logs/play_selected.npz
+uv run --no-sync supermimic play   --checkpoint logs/q1_fresh/checkpoint_5000.pt   --motion datasets/motion_lafan/complex_motion/run1_subject5.npz   --viewer off --output logs/play_selected.npz
 ```
 
 ## 整段录像
@@ -122,13 +140,13 @@ uv run --no-sync supermimic play   --checkpoint logs/q1_fresh/checkpoint_5000.pt
 录像使用保留全部分段的原始 LAFAN 目录，输出策略与参考并排的 MP4。
 
 ```bash
-MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa uv run --no-sync supermimic record   --checkpoint logs/q1_fresh/checkpoint_5000.pt   --motion-dir data/q1_motion_library/lafan1   --output-dir logs/video_5000 --seed 0
+MUJOCO_GL=osmesa PYOPENGL_PLATFORM=osmesa uv run --no-sync supermimic record   --checkpoint logs/q1_fresh/checkpoint_5000.pt   --motion-dir datasets/motion_lafan/complex_motion   --output-dir logs/video_5000 --seed 0
 ```
 
 每 5000 轮自动抽取一整条录像：
 
 ```bash
-uv run --no-sync supermimic watch-videos   --run-dir logs/q1_fresh   --motion-dir data/q1_motion_library/lafan1 --interval 5000
+uv run --no-sync supermimic watch-videos   --run-dir logs/q1_fresh   --motion-dir datasets/motion_lafan/complex_motion --interval 5000
 ```
 
 使用 NVIDIA GPU 无屏绘图时，可为 watcher 添加 `--render-device 0`。

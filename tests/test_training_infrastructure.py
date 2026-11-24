@@ -124,8 +124,12 @@ def test_replay_resume_preserves_wrapped_rows_and_breaks_old_new_episode():
   add_replay_step(restored, 100)
   add_replay_step(restored, 101)
   batch = restored.sample(512, window=3, history=1)
-  assert (batch.states[:, 1:, 0] - batch.states[:, :-1, 0] == 1).all()
-  assert batch.states.max() <= 10
+  assert batch.valid is not None
+  differences = batch.states[:, 1:, 0] - batch.states[:, :-1, 0]
+  assert (differences[batch.valid[:, 1:]] == 1).all()
+  old_episode = batch.states[:, 0, 0] <= 10
+  assert batch.states[old_episode].max() <= 10
+  assert batch.states[~old_episode].min() >= 100
   with pytest.raises(ValueError, match="count"):
     restored.load_state_dict(saved | {"count": 9})
   with pytest.raises(ValueError, match="tensor"):

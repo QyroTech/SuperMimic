@@ -58,7 +58,7 @@ def build_index(cfg: IndexCfg) -> dict[str, Any]:
     raise ValueError(f"Corpora were imported against different XMLs: {sorted(hashes)}")
   return {
     "library": str(cfg.library),
-    "robot": "q1_v2",
+    "robot": "q1_v3",
     "xml_sha256": hashes.pop(),
     "fps": cfg.target_fps,
     "clips": sum(source["clips"] for source in sources),

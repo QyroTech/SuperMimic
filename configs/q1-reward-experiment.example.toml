@@ -2,7 +2,7 @@
 # The baseline training job and checkpoint are left intact.
 # All counts are GLOBAL totals. Paths resolve relative to this TOML file.
 [train]
-robot_xml = "../assets/q1_v2/xml/q1_v2_mc.xml"
+robot_xml = "../assets/q1_v3/xml/q1_v3_mc.xml"
 motion_dir = "../data/q1_motion_library"
 output_dir = "../logs/q1_arm_joint_experiment"
 warm_start = "../logs/q1_long/checkpoint_25000.pt"

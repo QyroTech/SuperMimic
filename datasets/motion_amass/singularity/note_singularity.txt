@@ -1,0 +1,65 @@
+1326 shoulder关节翻转
+1327 shoulder关节翻转
+1328 shoulder关节翻转
+1329 shoulder关节翻转
+1505 shoulder关节翻转
+1511 shoulder关节翻转
+1513 shoulder关节翻转
+2605：shoulder关节翻转
+2705：shoulder关节翻转
+2803：shoulder关节翻转
+2807：shoulder关节翻转
+2811：shoulder关节翻转
+2913：shoulder关节翻转
+2916：shoulder关节翻转
+2923：shoulder关节翻转
+2925：shoulder关节翻转
+3003：shoulder关节翻转
+3004：shoulder关节翻转
+3006：shoulder关节翻转
+3011：shoulder关节翻转
+3012：shoulder关节翻转
+3014：shoulder关节翻转
+3107：shoulder关节翻转
+3109：shoulder关节翻转
+3110：shoulder关节翻转
+3113：shoulder关节翻转
+3205：shoulder关节翻转
+3206：shoulder关节翻转
+3209：shoulder关节翻转
+3211：shoulder关节翻转
+3212：shoulder关节翻转
+3214：shoulder关节翻转
+4922：shoudler关节翻转
+5401-5402：shoulder关节翻转
+5405-5406：shoulder关节翻转
+5424：shoulder关节翻转
+5503：shoulder关节翻转
+5508-5509：shoulder关节翻转
+5517：shoulder关节翻转
+5523-5524：shoulder关节翻转
+5526：shoulder关节翻转
+5604：shoulder关节翻转
+6012：shoulder关键翻转
+6013：elbow有跳变
+6112：shoulder关节翻转
+6222：shoulder关节翻转
+7902：shoulder关节翻转
+7907:elbow跳变
+7922：shoulder关节翻转
+7949：shoulder关节翻转
+8049：shoulder关节翻转
+8054：shoulder关节翻转
+8072：shoulder关节翻转
+8603：shoulder关节翻转
+8607-8608：shoulder关节翻转
+8611：shoulder关节翻转
+8811：shoulder关节翻转
+8901:shoulder关节翻转
+9416：shoulder关节翻转
+10302：shoulder关节翻转
+11132：shoulder关节翻转
+11403：shoulder关节翻转
+12004：shoulder关节翻转
+12222：shoulder关节翻转
+13310：shoulder关节翻转

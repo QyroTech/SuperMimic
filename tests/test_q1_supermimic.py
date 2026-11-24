@@ -33,7 +33,7 @@ from supermimic.train import TrainCfg, select_motions
 @pytest.fixture
 def robot(tmp_path: Path) -> Q1Robot:
   """Small synthetic Q1-shaped articulation, with nonzero hinge anchors."""
-  tree = ET.Element("mujoco", model="q1_v2")
+  tree = ET.Element("mujoco", model="q1_v3")
   ET.SubElement(tree, "compiler", angle="radian", autolimits="true")
   ET.SubElement(tree, "option", timestep="0.001", gravity="0 0 0")
   world = ET.SubElement(tree, "worldbody")
@@ -242,7 +242,7 @@ def test_cached_rollout_preserves_complete_policy_update(
   np.savez(
     path,
     qpos=qpos,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     fps=50,
     robot_joint_names=np.array(robot.joint_names),
@@ -322,10 +322,15 @@ def test_replay_wrap_and_terminal_next_state(robot: Q1Robot):
       torch.tensor([step]),
     )
   batch = replay.sample(128, window=2, history=3)
-  assert set(batch.frames.tolist()).issubset({5, 6})
-  assert (batch.history[:, 1:, 0] - batch.history[:, :-1, 0] == 1).all()
+  assert set(batch.frames.tolist()).issubset(set(range(3, 10)))
+  first = torch.where(batch.frames <= 7, 3, 8)
+  expected = torch.maximum(batch.frames[:, None] + torch.arange(-2, 1), first[:, None])
+  torch.testing.assert_close(batch.history[:, :, 0], expected.float())
   assert (batch.next_states[:, :, 0] == batch.states[:, :, 0] + 1).all()
-  assert (batch.terminated[:, -1] == 1).any()
+  assert batch.valid is not None
+  assert ((batch.terminated == 1) & batch.valid).any()
+  crossing = batch.frames == 7
+  assert crossing.any() and not batch.valid[crossing, 1].any()
 
 
 def test_gae_bootstrap_and_terminal_mask():
@@ -361,7 +366,7 @@ def test_model_loss_sums_normalized_features_and_retains_bce(
   np.savez(
     path,
     qpos=qpos,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     fps=50,
     robot_joint_names=robot.joint_names,
@@ -419,7 +424,7 @@ def test_fused_model_loss_preserves_bptt_gradients_and_optimizer_updates(
   np.savez(
     path,
     qpos=qpos,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     fps=50,
     robot_joint_names=robot.joint_names,
@@ -482,7 +487,7 @@ def test_named_motion_reorders_joints_and_rejects_wrong_robot(
   np.savez(
     path,
     qpos=qpos,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     fps=50,
     robot_joint_names=names,
@@ -563,7 +568,7 @@ def test_motions_decode_once_and_bound_their_own_memory(robot: Q1Robot, tmp_path
     np.savez(
       path,
       qpos=qpos,
-      robot_name="q1_v2",
+      robot_name="q1_v3",
       root_quat_order="wxyz",
       fps=50,
       robot_joint_names=robot.joint_names,
@@ -800,7 +805,7 @@ def pickled_record(qpos: np.ndarray, names: Sequence[str], fps: float = 50.0) ->
     "root_quat": qpos[:, 3:7][:, [1, 2, 3, 0]].astype(np.float32),
     "dof_pos": qpos[:, 7:].astype(np.float32),
     "joint_names": list(names),
-    "robot_name": "q1_v2",
+    "robot_name": "q1_v3",
     "fps": fps,
     "metadata": {"root_quat_order": "xyzw", "dof_unit": "rad"},
   }

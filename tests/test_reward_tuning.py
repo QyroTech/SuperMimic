@@ -251,7 +251,7 @@ def test_cpu_comparison_selects_arm_joints_by_name_after_xml_reordering(tmp_path
   np.savez(
     reference,
     qpos=qpos,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     fps=50.0,
     robot_joint_names=np.array(robot.joint_names),

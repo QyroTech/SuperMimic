@@ -168,8 +168,8 @@ class Q1Motions:
   def _decode(self, clip: int) -> Tensor:
     path = self.paths[clip]
     with np.load(path, allow_pickle=False) as data:
-      if str(data["robot_name"].item()) != "q1_v2":
-        raise ValueError(f"{path}: expected robot_name=q1_v2")
+      if str(data["robot_name"].item()) != "q1_v3":
+        raise ValueError(f"{path}: expected robot_name=q1_v3")
       if str(data["root_quat_order"].item()) != "wxyz":
         raise ValueError(f"{path}: expected WXYZ root quaternions")
       if not np.isclose(float(data["fps"].item()), 1 / self.dt):

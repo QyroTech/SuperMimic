@@ -44,7 +44,7 @@ def environment(tmp_path: Path) -> tuple[Q1Robot, Q1Motions]:
   np.savez(
     path,
     qpos=qpos,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     robot_joint_names=np.array(robot.joint_names),
     fps=50.0,

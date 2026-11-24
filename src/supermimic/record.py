@@ -56,7 +56,7 @@ def assemble(paths: list[Path], output: Path) -> None:
   names = None
   for path in paths:
     with np.load(path, allow_pickle=False) as data:
-      if str(data["robot_name"].item()) != "q1_v2":
+      if str(data["robot_name"].item()) != "q1_v3":
         raise ValueError("Only Q1 V2 references are supported")
       if not np.isclose(float(data["fps"].item()), 50):
         raise ValueError("Expected 50 Hz LAFAN references")
@@ -68,7 +68,7 @@ def assemble(paths: list[Path], output: Path) -> None:
   np.savez_compressed(
     output,
     qpos=np.concatenate(frames),
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     fps=50.0,
     robot_joint_names=np.array(names),

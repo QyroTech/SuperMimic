@@ -18,7 +18,7 @@
     "OPENBLAS_NUM_THREADS": "1"
   },
   "train": {
-    "robot_xml": "assets/q1_v2/xml/q1_v2_mc.xml",
+    "robot_xml": "assets/q1_v3/xml/q1_v3_mc.xml",
     "motion_dir": "data/q1_motion_library_filtered",
     "motion_pattern": "*/*.npz",
     "max_motions": 0,

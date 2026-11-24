@@ -57,6 +57,7 @@ def evaluate(cfg: EvalCfg) -> EvaluationResult:
     robot,
     tuple(identity["actor_hidden"]),
     activation=config.get("network_activation", "elu"),
+    network_profile=config.get("network_profile", "legacy"),
   ).to(cfg.device)
   actor.load_state_dict(checkpoint["actor"])
   actor.eval()
@@ -116,7 +117,7 @@ def evaluate(cfg: EvalCfg) -> EvaluationResult:
     rows.append(row)
     print(json.dumps(row), flush=True)
   result: EvaluationResult = {
-    "robot": "q1_v2",
+    "robot": "q1_v3",
     "checkpoint": str(cfg.checkpoint.resolve()),
     "motions": len(rows),
     "failures": sum(r["failed"] for r in rows),

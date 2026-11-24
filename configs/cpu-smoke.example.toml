@@ -1,6 +1,6 @@
 # A bounded pipeline check using your own Q1 XML and 50 Hz named motion NPZ.
 [train]
-robot_xml = "../assets/q1_v2/xml/q1_v2_mc.xml"
+robot_xml = "../assets/q1_v3/xml/q1_v3_mc.xml"
 motion_dir = "../data/q1_smoke"
 output_dir = "../logs/cpu_smoke"
 device = "cpu"

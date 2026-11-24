@@ -243,8 +243,8 @@ def inspect_motion(
   report.checks["root_quat_order"] = quat_order
   if not fps_matches:
     report.errors.append("Motion FPS does not match loader control frequency")
-  if robot_name != "q1_v2":
-    report.errors.append("Expected robot_name=q1_v2")
+  if robot_name != "q1_v3":
+    report.errors.append("Expected robot_name=q1_v3")
   if quat_order != "wxyz":
     report.errors.append("Expected root_quat_order=wxyz")
   names_valid = (
@@ -285,7 +285,7 @@ def inspect_motion(
     report.errors.append("Root quaternions violate loader unit-length tolerance")
   if not names_valid or not quaternion_valid or quat_order != "wxyz":
     return report
-  if robot_name != "q1_v2":
+  if robot_name != "q1_v3":
     return report
   qpos = np.concatenate(
     (raw[:, :7], raw[:, [7 + names.index(name) for name in robot.joint_names]]),

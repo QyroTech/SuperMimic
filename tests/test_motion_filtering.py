@@ -22,7 +22,7 @@ from supermimic.filter_motions import (
 
 
 def write_fixture(path: Path, overlap: bool = False) -> Path:
-  tree = ET.Element("mujoco", model="q1_v2")
+  tree = ET.Element("mujoco", model="q1_v3")
   ET.SubElement(tree, "compiler", angle="radian", autolimits="true")
   world = ET.SubElement(tree, "worldbody")
   ET.SubElement(world, "geom", type="plane", size="5 5 .1")
@@ -63,7 +63,7 @@ def write_motion(path: Path, geometry: CollisionGeometry, qpos: Any = None) -> P
   np.savez_compressed(
     path,
     qpos=qpos,
-    robot_name="q1_v2",
+    robot_name="q1_v3",
     root_quat_order="wxyz",
     fps=50.0,
     robot_joint_names=np.array(geometry.joint_names),

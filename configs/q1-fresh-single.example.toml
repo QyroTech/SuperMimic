@@ -1,6 +1,6 @@
 # Single GPU, initialized from zero. Paths resolve relative to this file.
 [train]
-robot_xml = "../assets/q1_v2/xml/q1_v2_mc.xml"
+robot_xml = "../assets/q1_v3/xml/q1_v3_mc.xml"
 motion_dir = "../data/q1_motion_library_filtered"
 output_dir = "../logs/q1_fresh_single"
 motion_pattern = "*/*.npz"

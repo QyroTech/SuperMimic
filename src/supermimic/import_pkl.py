@@ -48,8 +48,8 @@ def record_to_qpos(
   missing = sorted(set(REQUIRED_RECORD_FIELDS).difference(record))
   if missing:
     raise ValueError(f"missing record fields {missing}; pose_aa alone is not accepted")
-  if str(record.get("robot_name", "")) != "q1_v2":
-    raise ValueError(f"expected robot_name=q1_v2, got {record.get('robot_name')!r}")
+  if str(record.get("robot_name", "")) != "q1_v3":
+    raise ValueError(f"expected robot_name=q1_v3, got {record.get('robot_name')!r}")
   metadata = record.get("metadata") or {}
   if not isinstance(metadata, dict):
     raise ValueError(f"metadata must be a dict, got {type(metadata).__name__}")
@@ -138,7 +138,7 @@ def import_one(path: Path, robot: Q1Robot, cfg: ImportCfg) -> dict[str, Any]:
         np.savez_compressed(
           handle,
           qpos=converted,
-          robot_name=np.array("q1_v2"),
+          robot_name=np.array("q1_v3"),
           root_quat_order=np.array("wxyz"),
           fps=np.array(cfg.target_fps),
           robot_joint_names=np.array(names),

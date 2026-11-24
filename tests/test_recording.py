@@ -27,7 +27,7 @@ def test_assembly_keeps_entire_original_motion(tmp_path: Path):
     np.savez(
       path,
       qpos=qpos,
-      robot_name="q1_v2",
+      robot_name="q1_v3",
       fps=50,
       robot_joint_names=np.array([f"joint_{j}" for j in range(22)]),
     )

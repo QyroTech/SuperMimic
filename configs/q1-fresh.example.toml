@@ -1,19 +1,22 @@
 # Fresh initialization: no warm_start/resume and no retained training counters.
-# Example for 8 GPUs: global counts below give 1024 envs and batches 512 per rank.
-# For 1 GPU, start with num_envs=1024 and both batch sizes=512, then tune memory.
+# Global counts follow the supermimic_vibed parameter baseline.
+# Eight ranks: envs=512, model batch=256, policy batch=512 per rank.
+# Device selection belongs to the launcher; this file starts no process.
 [train]
-robot_xml = "../assets/q1_v2/xml/q1_v2_mc.xml"
+robot_xml = "../assets/q1_v3/xml/q1_v3_mc.xml"
 motion_dir = "../data/q1_motion_library_filtered"
 output_dir = "../logs/q1_fresh"
 motion_pattern = "*/*.npz"
 max_motions = 0
 device = "cuda:0"
-num_envs = 8192
-model_batch_size = 4096
+num_envs = 4096
+model_batch_size = 2048
 policy_batch_size = 4096
 iterations = 250000
 replay_steps = 1000
 model_batches = 10
+horizon = 32
+model_warmup_iterations = 500
 critic_epochs = 5
 critic_minibatches = 4
 learning_rate = 0.0002
@@ -30,7 +33,7 @@ cache_reference_heads = true
 cache_goals = true
 capture_reset = true
 capture_imagination = true
-compile_critic = false
+compile_critic = true
 fused_optimizers = false
 runtime_checks = "per_update"
 clean_policy_actions = true
@@ -39,6 +42,8 @@ action_noise = 0.0
 modeled_action_delay = true
 network_activation = "silu"
 dynamics_representation = "heading"
+network_profile = "running_silu"
+mlp_precision = "bf16"
 normalize_policy_objective = true
 normalize_model_objective = true
 reward_arm_joint_weight = 0.05

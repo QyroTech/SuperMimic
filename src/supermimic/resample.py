@@ -92,7 +92,7 @@ def resample(cfg: ResampleCfg) -> Path:
   for path in paths:
     try:
       with np.load(path, allow_pickle=False) as data:
-        if str(data["robot_name"].item()) != "q1_v2":
+        if str(data["robot_name"].item()) != "q1_v3":
           raise ValueError("Expected Q1 V2 metadata")
         if str(data["root_quat_order"].item()) != "wxyz":
           raise ValueError("Expected WXYZ root quaternions")

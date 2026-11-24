@@ -88,6 +88,7 @@ def play(cfg: PlayCfg) -> PlayResult:
     robot,
     tuple(identity["actor_hidden"]),
     activation=config.get("network_activation", "elu"),
+    network_profile=config.get("network_profile", "legacy"),
   ).to(cfg.device)
   actor.load_state_dict(checkpoint["actor"])
   actor.eval()
@@ -177,7 +178,7 @@ def play(cfg: PlayCfg) -> PlayResult:
     # motion, with the tracked reference stored alongside it for comparison.
     np.savez_compressed(
       cfg.output,
-      robot_name="q1_v2",
+      robot_name="q1_v3",
       root_quat_order="wxyz",
       fps=1 / dt,
       robot_joint_names=np.array(robot.joint_names),

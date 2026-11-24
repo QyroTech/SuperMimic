@@ -488,8 +488,8 @@ def read_motion(
       )
       if key in archive
     }
-    if metadata.get("robot_name") != "q1_v2":
-      raise ValueError("robot_name must be q1_v2")
+    if metadata.get("robot_name") != "q1_v3":
+      raise ValueError("robot_name must be q1_v3")
     if metadata.get("root_quat_order") != "wxyz":
       raise ValueError("root_quat_order must be wxyz")
     if not np.isclose(float(archive["fps"].item()), fps):

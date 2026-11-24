@@ -1,0 +1,359 @@
+{
+  "xml_sha256": "d9442f0de18071b100d927e310bc58b04e7be305fea8f126893b2700e8c4bd3b",
+  "asset_sha256": "221cf2b8d8c47aaff1b5ccf43f84fe961753b13fdd8959a98c098b884ea5546b",
+  "joint_names": [
+    "left_hip_pitch_joint",
+    "left_hip_roll_joint",
+    "left_hip_yaw_joint",
+    "left_knee_joint",
+    "left_ankle_pitch_joint",
+    "left_ankle_roll_joint",
+    "right_hip_pitch_joint",
+    "right_hip_roll_joint",
+    "right_hip_yaw_joint",
+    "right_knee_joint",
+    "right_ankle_pitch_joint",
+    "right_ankle_roll_joint",
+    "waist_roll_joint",
+    "waist_yaw_joint",
+    "left_shoulder_pitch_joint",
+    "left_shoulder_roll_joint",
+    "left_shoulder_yaw_joint",
+    "left_elbow_joint",
+    "right_shoulder_pitch_joint",
+    "right_shoulder_roll_joint",
+    "right_shoulder_yaw_joint",
+    "right_elbow_joint"
+  ],
+  "control_dt": 0.02,
+  "reward_scaling": {
+    "mode": "legacy",
+    "position_std": 0.3,
+    "orientation_std": 0.4,
+    "linear_velocity_std": 1.0,
+    "angular_velocity_std": 3.14,
+    "joint_sum_multiplier": 1.0,
+    "termination_height": 0.25,
+    "termination_tilt": 0.8,
+    "length_scale": 1.0,
+    "nominal_pelvis_height": null,
+    "reference_pelvis_height": null,
+    "joint_count": 22,
+    "reference_joint_count": 29
+  },
+  "reward_tuning": {
+    "arm_joint_weight": 0.0,
+    "arm_pd_target_weight": 0.0,
+    "arm_error_std": 0.8,
+    "action_scale": 0.5,
+    "body_orientation_std": null
+  },
+  "training_semantics": {
+    "clean_policy_actions": false,
+    "action_lag": false,
+    "horizon": 32,
+    "model_warmup_iterations": 0,
+    "normalize_policy_objective": false,
+    "normalize_model_objective": false,
+    "imagination_terminal_handling": "survival_weighted_absorbing_v1",
+    "imagination_min_survival": 1e-06
+  },
+  "physics_timestep": 0.001,
+  "xml_timestep": 0.001,
+  "solver_tolerance": 1e-08,
+  "source_file_sha256": {
+    "__init__.py": "04ed7c781e1eaf48db70475262a74ed927db5fee11d47f2fc53bad525cbaa6d0",
+    "__main__.py": "3cdf0c9734b91335f453a6db17e24c15f5d3335b9e3e1b43dbcd11401457f293",
+    "algorithm.py": "a5dac4fceabc0902b517f03ba6fc7f23898fa0330d50a9d8fdfbf9fdc508180b",
+    "checkpoint.py": "f18dc796c7cfa046d6adc293649bf3d14605b2e8adb46b57f2c2083b39f10b69",
+    "cli.py": "10530289233c893eb05457f1d802ec7176bfea599411b8f844801d1e126f5cf0",
+    "collection.py": "3bcd8040f9ab50b832f8e0e6ccefe8dd6a96f7a49e913f1ee5be9128659b6742",
+    "compile_runtime.py": "538a5a9a6bba5f71164ff07adbd1281251ae1ac36c1770c7571af7a62ba5328f",
+    "data.py": "71fe64317e66ec1e767c8349895fd3f4e05fb01f6a7a8858eb00a1159d175ac0",
+    "diagnostics.py": "aff6515845064596de13ccaab06cd4bc9931a5b0b80d95be0acf972a04514399",
+    "distributed.py": "a5c97da7697fe71827a9fe114d86e0e69b23df05fafd9b3dfd92c1113d941174",
+    "evaluate.py": "08d0e3f862615b760d01ba3b0a284d218aa7648e6a994a3dee2e92862c6be1d0",
+    "filter_motions.py": "e8ef08a87d684ca94a380f005d6724924d9b3a1543062fb5d2b15a8ca8ff5ebe",
+    "imagination_graph.py": "1f2e24654ccb5810b9a1b8a31c28713531b708c9b6489990e05e60ffe1769085",
+    "imagination_terminal.py": "70839f64782643c503dbffffdb0a3a476b252fe11ba1788332eeb258d8dcab78",
+    "import_pkl.py": "c84ee098890685dd8f20d0a701dab71aec6ad4bbd1822ea55031a6de8b3b5530",
+    "launch.py": "9c84623b1a6a03794c4d5f551dfc812cf7255cb8b8da03ceeb382c42a1188779",
+    "library_index.py": "159fac13af9cd4ad5cbe31fc79958ceedfd2b8ffb901e8071ccd0bf6b7e4a266",
+    "models.py": "bb942821378f5fca718c417209426186b6329111d7fe3b1bcfca5f2d09da28b5",
+    "normalization.py": "87700a9178c3800098ec81f7dcd27fe0997790a54024d36310977db7405a24de",
+    "play.py": "161a86d58aea0c3bccca4ce82637eca5f538ee192a4fd12c1664f50b60001466",
+    "preflight.py": "1eac0c4549057de9d60620b3522704afde0e530d8d39c3c167ac3a7362064387",
+    "randomization.py": "f64d3057903ad73ad88c43bdf74d5eed8b55ee0bd4e72cf7e0581250dadb701f",
+    "record.py": "c6d663e3d4df710094abe765b8dd97a3be54c36d8729c5b34b1b54257872c42b",
+    "replay.py": "9335dfffd017f9aa8460ebf7ad486c3b26fb6e6094d796d854730eeb84a0d535",
+    "resample.py": "bda50ed1aa9b116f1f6a26e6a769e4512a963722006afe199f1530d5c6c6f7d1",
+    "reshard.py": "72ef59140dbf91e8505088bd0e68ec1f3bbc53397c3ea51af432c76cb2af746b",
+    "reward_tuning.py": "15dd63c91cf3cdbc2e2d95017a88c91a01d2fbae858acf0bf3eb55dabeb317c9",
+    "robot.py": "1d5e8670774ed26b844d3153fbceaa8823d50886bea6a0e8b7a6b460fe477954",
+    "simulator.py": "b941655b4c527fb92c498b213ca2c6e035fd4ced3626d0bb7a0502aa4f1627a8",
+    "state_representation.py": "a5e5a5fa095f8b6b985f9afe9a63779dd9f7cccbaaee2bfe73ab70ab0443aa12",
+    "train.py": "48f194eb4cada125531aebcb51dcf48a7a47c0270c5882af35ee446b44b8d29c",
+    "training_monitor.py": "a8d5a0dbbdd1eeceeed202f99429412b84e07b22f7eec2c681bcde179850bfb7",
+    "video_watcher.py": "bc5f5c3b4c7193ee6aee7d16273d93444dcd8dae94bf860dd3483980783632ed",
+    "warm_start.py": "cd67a8ee2d6e5ab8d0b4b0f9066ef1d8bb658e1485041899c16abb95db7d6496",
+    "warp_runtime.py": "8ad19d30256d35277e148e63cf5e01c38a582a5642ee07dfeda228ebb8601f23"
+  },
+  "software_versions": {
+    "torch": "2.7.0",
+    "mujoco": "3.6.0",
+    "mujoco-warp": "3.6.0",
+    "warp-lang": "1.12.0",
+    "numpy": "2.5.4",
+    "python": "3.13.11"
+  },
+  "device_name": "x86_64",
+  "state_dim": 79,
+  "obs_dim": 72,
+  "context_dim": 120,
+  "randomization": {
+    "friction": [
+      0.3,
+      1.2
+    ],
+    "encoder_bias": [
+      -0.02,
+      0.02
+    ],
+    "kp_factor": [
+      0.8,
+      1.2
+    ],
+    "kd_factor": [
+      0.9,
+      1.1
+    ],
+    "base_com": [
+      [
+        -0.025,
+        0.025
+      ],
+      [
+        -0.05,
+        0.05
+      ],
+      [
+        -0.05,
+        0.05
+      ]
+    ],
+    "torso_added_mass": [
+      -1.5,
+      1.5
+    ],
+    "push_interval_seconds": [
+      1.0,
+      3.0
+    ],
+    "push_velocity": [
+      [
+        -0.5,
+        0.5
+      ],
+      [
+        -0.5,
+        0.5
+      ],
+      [
+        -0.2,
+        0.2
+      ],
+      [
+        -0.52,
+        0.52
+      ],
+      [
+        -0.52,
+        0.52
+      ],
+      [
+        -0.78,
+        0.78
+      ]
+    ]
+  },
+  "mlp_precision_actual": "fp32",
+  "network_architecture": {
+    "activation": "elu",
+    "representation": "legacy",
+    "modeled_action_delay": false
+  },
+  "model_hidden": [
+    64,
+    64
+  ],
+  "actor_hidden": [
+    64,
+    64
+  ],
+  "critic_hidden": [
+    64,
+    32
+  ],
+  "available_motions": 39,
+  "selected_motions": 1,
+  "motion_selection": "random",
+  "motion_seed": 0,
+  "motion_paths": [
+    "/home/agiuser/code/OpenSource/SuperMimic/datasets/train_50hz/motion_lafan/complex_motion/pushAndFall1_subject4.npz"
+  ],
+  "motion_lengths": [
+    8262
+  ],
+  "kp": [
+    40.0,
+    40.0,
+    40.0,
+    40.0,
+    20.0,
+    10.0,
+    40.0,
+    40.0,
+    40.0,
+    40.0,
+    20.0,
+    10.0,
+    80.0,
+    80.0,
+    80.0,
+    80.0,
+    80.0,
+    80.0,
+    80.0,
+    80.0,
+    80.0,
+    80.0
+  ],
+  "kd": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0,
+    2.0
+  ],
+  "use_tn": true,
+  "torque_speed_peak_nm": [
+    34.0,
+    34.0,
+    34.0,
+    34.0,
+    21.0,
+    21.0,
+    34.0,
+    34.0,
+    34.0,
+    34.0,
+    21.0,
+    21.0,
+    34.0,
+    34.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0,
+    21.0
+  ],
+  "torque_speed_knee_rad_s": [
+    7.5,
+    7.5,
+    7.5,
+    7.5,
+    8.0,
+    8.0,
+    7.5,
+    7.5,
+    7.5,
+    7.5,
+    8.0,
+    8.0,
+    7.5,
+    7.5,
+    8.0,
+    8.0,
+    8.0,
+    8.0,
+    8.0,
+    8.0,
+    8.0,
+    8.0
+  ],
+  "torque_speed_cutoff_rad_s": [
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    16.0,
+    16.0,
+    17.0,
+    17.0,
+    17.0,
+    17.0,
+    16.0,
+    16.0,
+    17.0,
+    17.0,
+    16.0,
+    16.0,
+    16.0,
+    16.0,
+    16.0,
+    16.0,
+    16.0,
+    16.0
+  ],
+  "default_q": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "calibration_semantics": "episode_default=xml_default+offset; observation=q-episode_default",
+  "world_size": 1,
+  "num_envs_per_rank": 2,
+  "global_parallel_envs": 2,
+  "model_batch_size_per_rank": 4,
+  "policy_batch_size_per_rank": 4,
+  "motion_storage": "shared"
+}
